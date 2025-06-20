@@ -3,22 +3,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include "serverpi.h"
 #include "serverausftp.h"
 
-// Esto es toda la parte de comunicacion
-#define MSG_220 "220 srvFtp version 1.0\r\n"
-#define MSG_331 "331 Password required for %s\r\n"
-#define MSG_230 "230 User %s logged in\r\n"
-#define MSG_530 "530 Login incorrect\r\n"
-#define MSG_221 "221 Goodbye\r\n"
-#define MSG_550 "550 %s: no such file or directory\r\n"
-#define MSG_299 "299 File %s size %ld bytes\r\n"
-#define MSG_226 "226 Transfer complete\r\n"
-
-// Primero declaro la parte de recepción de comandos
+int is_valid_command(const char *command)
+{
+    int i = 0;
+    while (valid_commands[i] != NULL)
+    {
+        if (strcmp(command, valid_commands[i]) == 0)
+        {
+            return arg_commands[i];
+        }
+        i++;
+    }
+    return -1;
+}
 
 /*
  * recv_cmd recepciona un comando desde el socketDescriptor.
@@ -30,30 +33,35 @@ int recv_cmd(int socketDescriptor, char *operation, char *param)
 {
     char buffer[BUFSIZE];
     char *token;
+    int args_number;
 
     if (recv(socketDescriptor, buffer, BUFSIZE, 0) < 0)
     {
-        fprintf(stderr, "error receiving data");
+        fprintf(stderr, "Error: no se puede recibir el comando.\n");
         return 1;
     }
 
     buffer[strcspn(buffer, "\r\n")] = 0;
     token = strtok(buffer, " ");
-
-    if (token == NULL || strlen(token) < 4)
+    if (token == NULL || strlen(token) < 3 || (args_number = is_valid_command(token)) < 0)
     {
-        fprintf(stderr, "not valid ftp command");
+        fprintf(stderr, "Error: comando no válido.\n");
         return 1;
     }
+    strcpy(operation, token);
+    if (!args_number)
+        return 0;              // No hay parámetro, se retorna inmediatamente.
+    token = strtok(NULL, " "); // Aca le indicamos que trabaja con el buffer que tenia.
+    // Este if y endif significa que si cuando compilamos en el gcc ponemos una -D debug, todo lo que pongamos ahi adentro se compila son esto.
+    #if DEBUG
+    printf("par %s\n", token);
+    #endif
+    if (token != NULL)
+        strcpy(param, token);
     else
     {
-        strcpy(operation, token);
-        token = strtok(NULL, " "); // Aca le indicamos que trabaja con el buffer que tenia.
-        // Este if y endif significa que si cuando compilamos en el gcc ponemos una -D debug, todo lo que pongamos ahi adentro se compila son esto.
-        #if DEBUG
-        printf("par %s\n", token);
-        #endif
-        if (token != NULL)
-            strcpy(param, token);
+        fprintf(stderr, "Error: se esperaba un argumento para el comando %s.\n", operation);
+        return 1;
     }
+    return 0;
 }

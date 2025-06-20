@@ -20,7 +20,7 @@ bool check_credentials(char *user, char *pass)
     file = fopen(path, "r");
     if (file == NULL)
     {
-        fprintf(stderr, "Error al abrir el archivo. %s\n", path);
+        fprintf(stderr, "Error: no se pudo abrir el archivo de usuarios.\n");
         return false;
     }
     while (getline(&line, &len, file) != -1)
